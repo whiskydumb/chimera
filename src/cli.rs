@@ -89,4 +89,10 @@ pub enum Command {
         /// description text
         description: String,
     },
+    /// write a default config.toml
+    Init {
+        /// overwrite an existing config
+        #[arg(long)]
+        force: bool,
+    },
 }

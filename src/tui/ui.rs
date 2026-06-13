@@ -11,6 +11,7 @@ const BAR_BG: Color = Color::Rgb(0x2a, 0x2e, 0x3a);
 const DARK: Color = Color::Rgb(0x1e, 0x1e, 0x2e);
 const SEARCH_BG: Color = Color::Rgb(0xb4, 0x9d, 0xf7);
 const PREVIEW_BG: Color = Color::Rgb(0x89, 0xb4, 0xfa);
+const CONFIRM_BG: Color = Color::Rgb(0xf3, 0x8b, 0xa8);
 const KEYS_BG: Color = Color::Rgb(0x3b, 0x40, 0x4e);
 const KEYS_FG: Color = Color::Rgb(0xc8, 0xcc, 0xd4);
 const POS_BG: Color = Color::Rgb(0xa6, 0xe3, 0xa1);
@@ -21,7 +22,7 @@ const SECTION_FG: Color = Color::Rgb(0x94, 0xe2, 0xd5);
 const SEP_RIGHT: &str = "\u{e0b0}"; //
 const SEP_LEFT: &str = "\u{e0b2}"; //
 
-const BINDS: &str = "↵ copy   ^Y clipboard   ^E edit   ⇥ pane   ↑↓ move   esc quit";
+const BINDS: &str = "↵ copy   ^Y clip   ^E edit   ^D del   ⇥ pane   ↑↓ move   esc quit";
 const SEARCH_HINT: &str = " Search   'exact  ^prefix  suffix$  !not  *glob ";
 
 pub fn render(frame: &mut Frame, app: &mut App) {
@@ -86,9 +87,13 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 /// builds the lualine-style status bar: a mode block (reflecting the focused
 /// pane) and our keybinds on the left, the selection position on the right.
 fn statusline(app: &App, width: u16) -> Line<'static> {
-    let mode_bg = match app.focus {
-        Focus::Results => SEARCH_BG,
-        Focus::Preview => PREVIEW_BG,
+    let mode_bg = if app.is_confirming() {
+        CONFIRM_BG
+    } else {
+        match app.focus {
+            Focus::Results => SEARCH_BG,
+            Focus::Preview => PREVIEW_BG,
+        }
     };
     let left: Vec<Span<'static>> = vec![
         Span::styled(

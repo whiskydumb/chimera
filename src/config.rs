@@ -66,6 +66,20 @@ impl Default for Config {
     }
 }
 
+/// the contents written by `chimera init`.
+const DEFAULT_CONFIG: &str = "\
+# chimera configuration.
+
+# editor used by `chimera edit` and Ctrl-E in the TUI.
+# falls back to $VISUAL / $EDITOR / the platform default when unset.
+# editor = \"nvim\"
+
+# syntax-highlighting theme for the preview (a syntect default theme). options:
+# base16-ocean.dark, base16-ocean.light, base16-eighties.dark, base16-mocha.dark,
+# \"Solarized (dark)\", \"Solarized (light)\", InspiredGitHub
+theme = \"base16-ocean.dark\"
+";
+
 impl Config {
     /// loads `config.toml`, returning defaults when the file is absent.
     pub fn load(paths: &Paths) -> Result<Self> {
@@ -75,5 +89,16 @@ impl Config {
         let raw = std::fs::read_to_string(&paths.config)
             .with_context(|| format!("failed to read {}", paths.config.display()))?;
         toml::from_str(&raw).with_context(|| format!("failed to parse {}", paths.config.display()))
+    }
+
+    /// writes the default `config.toml`. returns `false` if it already exists and
+    /// `force` is not set.
+    pub fn write_default(paths: &Paths, force: bool) -> Result<bool> {
+        if paths.config.exists() && !force {
+            return Ok(false);
+        }
+        std::fs::write(&paths.config, DEFAULT_CONFIG)
+            .with_context(|| format!("failed to write {}", paths.config.display()))?;
+        Ok(true)
     }
 }

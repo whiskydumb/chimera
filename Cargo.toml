@@ -16,6 +16,7 @@ clap = { version = "4.6.1", features = ["derive"] }
 directories = "6.0.0"
 globset = "0.4.18"
 ignore = "0.4.26"
+notify = "8.2.0"
 nucleo-matcher = "0.3.1"
 ratatui = "0.30.1"
 rusqlite = { version = "0.37", features = ["bundled"] }

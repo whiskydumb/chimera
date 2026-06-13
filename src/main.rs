@@ -35,6 +35,7 @@ fn main() -> Result<()> {
         Some(Command::Mv { from, to }) => cmd_mv(&paths, &from, &to),
         Some(Command::Tag { path, add, rm, set }) => cmd_tag(&paths, &path, &add, &rm, set),
         Some(Command::Describe { path, description }) => cmd_describe(&paths, &path, &description),
+        Some(Command::Init { force }) => cmd_init(&paths, force),
         None => tui::run(paths),
     }
 }
@@ -146,6 +147,18 @@ fn cmd_describe(paths: &Paths, rel: &str, description: &str) -> Result<()> {
     let conn = index::db::open(paths)?;
     index::reindex::index_one(&conn, paths, &paths.library.join(rel))?;
     println!("updated description for {rel}");
+    Ok(())
+}
+
+fn cmd_init(paths: &Paths, force: bool) -> Result<()> {
+    if config::Config::write_default(paths, force)? {
+        println!("wrote default config to {}", paths.config.display());
+    } else {
+        println!(
+            "config already exists at {} (use --force to overwrite)",
+            paths.config.display()
+        );
+    }
     Ok(())
 }
 

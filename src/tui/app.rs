@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -12,6 +13,7 @@ use rusqlite::Connection;
 
 use crate::config::{Config, Paths};
 use crate::editor;
+use crate::index::db;
 use crate::index::reindex;
 use crate::index::search::{self, Hit, Results};
 use crate::library::store;
@@ -59,6 +61,8 @@ pub struct App {
     preview_viewport: u16,
     outcome: Option<PathBuf>,
     pending_edit: Option<String>,
+    /// rel-path of an entry awaiting delete confirmation.
+    confirm: Option<String>,
     should_quit: bool,
 }
 
@@ -84,12 +88,17 @@ impl App {
             preview_viewport: 0,
             outcome: None,
             pending_edit: None,
+            confirm: None,
             should_quit: false,
         }
     }
 
     /// the render/input loop. returns the chosen entry's absolute path, if any.
-    pub fn run_loop(&mut self, terminal: &mut DefaultTerminal) -> Result<Option<PathBuf>> {
+    pub fn run_loop(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        fs_events: &Receiver<()>,
+    ) -> Result<Option<PathBuf>> {
         loop {
             terminal.draw(|frame| ui::render(frame, self))?;
             if event::poll(POLL)? {
@@ -103,6 +112,14 @@ impl App {
             if let Some(rel) = self.pending_edit.take() {
                 self.run_editor(terminal, &rel)?;
             }
+            // coalesce a burst of filesystem events into a single reload.
+            let mut changed = false;
+            while fs_events.try_recv().is_ok() {
+                changed = true;
+            }
+            if changed {
+                self.reload()?;
+            }
             if self.should_quit {
                 return Ok(self.outcome.take());
             }
@@ -110,12 +127,16 @@ impl App {
     }
 
     fn on_key(&mut self, key: KeyEvent) -> Result<()> {
+        if self.confirm.is_some() {
+            return self.handle_confirm(key);
+        }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
             KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('c' | 'q') if ctrl => self.should_quit = true,
             KeyCode::Tab => self.toggle_focus(),
             KeyCode::Char('e') if ctrl => self.pending_edit = self.selected_rel(),
+            KeyCode::Char('d') if ctrl => self.request_delete(),
             KeyCode::Char('y') if ctrl => self.copy_to_clipboard(),
             KeyCode::Char('n') if ctrl => self.select_step(1),
             KeyCode::Char('p') if ctrl => self.select_step(-1),
@@ -231,12 +252,20 @@ impl App {
         }
     }
 
-    /// the statusline mode label, reflecting the focused pane.
+    /// the statusline mode label, reflecting a pending confirm or the focused pane.
     pub fn mode(&self) -> &'static str {
+        if self.confirm.is_some() {
+            return "CONFIRM";
+        }
         match self.focus {
             Focus::Results => "SEARCH",
             Focus::Preview => "PREVIEW",
         }
+    }
+
+    /// whether a destructive action is awaiting confirmation.
+    pub fn is_confirming(&self) -> bool {
+        self.confirm.is_some()
     }
 
     /// records the preview viewport height (called by the renderer each frame),
@@ -247,15 +276,75 @@ impl App {
         self.preview_scroll = self.preview_scroll.min(max);
     }
 
-    /// reruns the search for the current query and rebuilds the sectioned rows.
+    /// reruns the search for the current query, resetting the selection to the top.
     pub fn refresh_results(&mut self) -> Result<()> {
+        self.sel = 0;
+        self.rebuild_rows()
+    }
+
+    /// rebuilds the sectioned rows from the current query, clamping the selection.
+    fn rebuild_rows(&mut self) -> Result<()> {
         let results = search::search(&self.conn, &self.query, RESULT_LIMIT)?;
         let (rows, hit_positions) = build_rows(results);
         self.rows = rows;
         self.hit_positions = hit_positions;
-        self.sel = 0;
+        if self.sel >= self.hit_positions.len() {
+            self.sel = 0;
+        }
         self.sync_selection();
         self.refresh_preview();
+        Ok(())
+    }
+
+    /// re-indexes the library from disk (after an external change) and re-runs the
+    /// current search, keeping the selected entry when it still exists.
+    fn reload(&mut self) -> Result<()> {
+        reindex::rebuild(&self.conn, &self.paths)?;
+        let previous = self.selected_rel();
+        self.rebuild_rows()?;
+        if let Some(rel) = previous {
+            self.select_rel(&rel);
+        }
+        self.status = "library changed — reindexed".to_string();
+        Ok(())
+    }
+
+    /// selects the hit with the given relative path, if it is present.
+    fn select_rel(&mut self, rel: &str) {
+        let found = self.hit_positions.iter().position(|&i| {
+            matches!(&self.rows[i], RowKind::Hit(hit) if hit.record.rel_path == rel)
+        });
+        if let Some(ordinal) = found {
+            self.sel = ordinal;
+            self.sync_selection();
+            self.refresh_preview();
+        }
+    }
+
+    /// asks to delete the selected entry; the next keypress confirms (y) or cancels.
+    fn request_delete(&mut self) {
+        if let Some(rel) = self.selected_rel() {
+            self.status = format!("delete {rel}? (y / n)");
+            self.confirm = Some(rel);
+        }
+    }
+
+    /// resolves a pending delete confirmation.
+    fn handle_confirm(&mut self, key: KeyEvent) -> Result<()> {
+        match key.code {
+            KeyCode::Char('y' | 'Y') => {
+                if let Some(rel) = self.confirm.take() {
+                    store::remove(&self.paths, &rel)?;
+                    db::remove(&self.conn, &rel)?;
+                    self.refresh_results()?;
+                    self.status = format!("removed {rel}");
+                }
+            }
+            _ => {
+                self.confirm = None;
+                self.status = "delete cancelled".to_string();
+            }
+        }
         Ok(())
     }
 
@@ -364,7 +453,6 @@ fn build_rows(results: Results) -> (Vec<RowKind>, Vec<usize>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::index::db;
     use crate::library::store::AddOptions;
 
     fn temp_paths() -> Paths {
