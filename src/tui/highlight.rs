@@ -1,11 +1,11 @@
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{FontStyle, Style as SynStyle, Theme, ThemeSet};
+use syntect::highlighting::{FontStyle, Style as SynStyle, Theme};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
+use two_face::theme::EmbeddedThemeName;
 
-const FALLBACK_THEME: &str = "base16-ocean.dark";
 const GUTTER_FG: Color = Color::Rgb(0x6c, 0x70, 0x86);
 const MATCH_FG: Color = Color::Rgb(0x1e, 0x1e, 0x2e);
 const MATCH_BG: Color = Color::Rgb(0xf9, 0xe2, 0xaf);
@@ -17,15 +17,11 @@ pub struct Highlighter {
 }
 
 impl Highlighter {
-    /// loads the extended syntect syntaxes (two-face) and a default theme.
+    /// loads the extended two-face syntaxes and the named embedded theme.
     pub fn new(theme_name: &str) -> Self {
         let syntaxes = two_face::syntax::extra_newlines();
-        let themes = ThemeSet::load_defaults();
-        let theme = themes
-            .themes
-            .get(theme_name)
-            .cloned()
-            .unwrap_or_else(|| themes.themes[FALLBACK_THEME].clone());
+        let themes = two_face::theme::extra();
+        let theme = themes[map_theme(theme_name)].clone();
         Self { syntaxes, theme }
     }
 
@@ -80,6 +76,39 @@ impl Highlighter {
 
 fn extension(file_name: &str) -> &str {
     file_name.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("")
+}
+
+/// maps a config theme name to a two-face embedded theme (default: base16 ocean dark).
+fn map_theme(name: &str) -> EmbeddedThemeName {
+    use EmbeddedThemeName as T;
+    match name.trim().to_ascii_lowercase().as_str() {
+        "base16-ocean.light" | "base16-ocean-light" => T::Base16OceanLight,
+        "base16-eighties.dark" => T::Base16EightiesDark,
+        "base16-mocha.dark" => T::Base16MochaDark,
+        "nord" => T::Nord,
+        "dracula" => T::Dracula,
+        "gruvbox-dark" | "gruvbox" => T::GruvboxDark,
+        "gruvbox-light" => T::GruvboxLight,
+        "solarized-dark" => T::SolarizedDark,
+        "solarized-light" => T::SolarizedLight,
+        "monokai" | "monokai-extended" => T::MonokaiExtended,
+        "one-half-dark" | "onehalf-dark" => T::OneHalfDark,
+        "one-half-light" | "onehalf-light" => T::OneHalfLight,
+        "catppuccin-mocha" => T::CatppuccinMocha,
+        "catppuccin-macchiato" => T::CatppuccinMacchiato,
+        "catppuccin-frappe" => T::CatppuccinFrappe,
+        "catppuccin-latte" => T::CatppuccinLatte,
+        "github" => T::Github,
+        "inspired-github" => T::InspiredGithub,
+        "coldark-dark" => T::ColdarkDark,
+        "coldark-cold" => T::ColdarkCold,
+        "dark-neon" => T::DarkNeon,
+        "sublime-snazzy" => T::SublimeSnazzy,
+        "two-dark" => T::TwoDark,
+        "zenburn" => T::Zenburn,
+        "leet" => T::Leet,
+        _ => T::Base16OceanDark,
+    }
 }
 
 /// turns syntect ranges into ratatui spans, restyling characters that fall

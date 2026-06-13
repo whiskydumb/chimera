@@ -17,10 +17,15 @@ use crate::config::Paths;
 use crate::library::store::{self, AddOptions};
 
 fn main() -> Result<()> {
-    init_tracing();
     let cli = Cli::parse();
     let paths = Paths::resolve()?;
     paths.ensure()?;
+
+    // logging targets stderr, which would corrupt the TUI's alternate screen —
+    // so it is enabled for cli subcommands only.
+    if cli.command.is_some() {
+        init_tracing();
+    }
 
     match cli.command {
         Some(Command::Add { paths: inputs, category, tags, description }) => {
@@ -56,6 +61,7 @@ fn cmd_add(paths: &Paths, inputs: &[PathBuf], opts: AddOptions) -> Result<()> {
             }
         }
     }
+    tracing::info!(added, deduped, "add");
     println!("done: {added} added, {deduped} duplicate(s) skipped");
     Ok(())
 }
@@ -63,6 +69,7 @@ fn cmd_add(paths: &Paths, inputs: &[PathBuf], opts: AddOptions) -> Result<()> {
 fn cmd_search(paths: &Paths, query: &str, limit: usize) -> Result<()> {
     let conn = index::db::open(paths)?;
     let results = index::search::search(&conn, query, limit)?;
+    tracing::info!(query, names = results.names.len(), content = results.content.len(), "search");
     if results.names.is_empty() && results.content.is_empty() {
         println!("no matches for {query:?}");
         return Ok(());
@@ -98,6 +105,7 @@ fn cmd_edit(paths: &Paths, rel: &str) -> Result<()> {
         store::rehash(paths, rel)?;
         let conn = index::db::open(paths)?;
         index::reindex::index_one(&conn, paths, &paths.library.join(rel))?;
+        tracing::info!(rel, "edited");
         println!("edited {rel}");
     } else {
         println!("editor exited without success; nothing reindexed");
@@ -111,6 +119,7 @@ fn cmd_copy(paths: &Paths, rel: &str, to: Option<PathBuf>) -> Result<()> {
         None => std::env::current_dir()?,
     };
     let dest = reuse::copy_into_dir(paths, rel, &dest_dir)?;
+    tracing::info!(rel, dest = %dest.display(), "copied");
     println!("copied to {}", dest.display());
     Ok(())
 }
@@ -120,6 +129,7 @@ fn cmd_rm(paths: &Paths, rels: &[String]) -> Result<()> {
     for rel in rels {
         store::remove(paths, rel)?;
         index::db::remove(&conn, rel)?;
+        tracing::info!(rel, "removed");
         println!("removed {rel}");
     }
     Ok(())
@@ -130,6 +140,7 @@ fn cmd_mv(paths: &Paths, from: &str, to: &str) -> Result<()> {
     store::rename(paths, from, to)?;
     index::db::remove(&conn, from)?;
     index::reindex::index_one(&conn, paths, &paths.library.join(to))?;
+    tracing::info!(from, to, "moved");
     println!("moved {from} -> {to}");
     Ok(())
 }
@@ -138,6 +149,7 @@ fn cmd_tag(paths: &Paths, rel: &str, add: &[String], rm: &[String], set: Option<
     let tags = store::edit_tags(paths, rel, add, rm, set)?;
     let conn = index::db::open(paths)?;
     index::reindex::index_one(&conn, paths, &paths.library.join(rel))?;
+    tracing::info!(rel, "tagged");
     println!("tags for {rel}: [{}]", tags.join(", "));
     Ok(())
 }
@@ -146,12 +158,14 @@ fn cmd_describe(paths: &Paths, rel: &str, description: &str) -> Result<()> {
     store::set_description(paths, rel, description)?;
     let conn = index::db::open(paths)?;
     index::reindex::index_one(&conn, paths, &paths.library.join(rel))?;
+    tracing::info!(rel, "described");
     println!("updated description for {rel}");
     Ok(())
 }
 
 fn cmd_init(paths: &Paths, force: bool) -> Result<()> {
     if config::Config::write_default(paths, force)? {
+        tracing::info!(config = %paths.config.display(), "config initialized");
         println!("wrote default config to {}", paths.config.display());
     } else {
         println!(
@@ -185,10 +199,15 @@ fn cmd_list(paths: &Paths) -> Result<()> {
 
 /// initializes stderr logging, controlled by the `CHIMERA_LOG` env var (default: warn).
 fn init_tracing() {
-    let filter = EnvFilter::try_from_env("CHIMERA_LOG").unwrap_or_else(|_| EnvFilter::new("warn"));
-    tracing_subscriber::fmt()
+    // controlled by CHIMERA_LOG (e.g. `info`, `debug`, `chimera=debug`); default: warn.
+    let filter = std::env::var("CHIMERA_LOG")
+        .ok()
+        .and_then(|directives| EnvFilter::try_new(directives).ok())
+        .unwrap_or_else(|| EnvFilter::new("warn"));
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_writer(std::io::stderr)
         .without_time()
-        .init();
+        .with_target(false)
+        .try_init();
 }

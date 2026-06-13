@@ -32,6 +32,13 @@ pub enum Focus {
     Preview,
 }
 
+/// vim-style editing mode: type to search (Insert) or navigate (Normal).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    Insert,
+    Normal,
+}
+
 /// a row in the results list: a non-selectable section header, or a hit.
 pub enum RowKind {
     Header(String),
@@ -56,6 +63,9 @@ pub struct App {
     pub preview: Text<'static>,
     pub status: String,
     pub focus: Focus,
+    mode: Mode,
+    /// true after a lone `d` in normal mode, awaiting the second `d` (dd).
+    pending_d: bool,
     pub preview_scroll: u16,
     preview_lines: usize,
     preview_viewport: u16,
@@ -83,6 +93,8 @@ impl App {
             preview: Text::default(),
             status: String::new(),
             focus: Focus::Results,
+            mode: Mode::Insert,
+            pending_d: false,
             preview_scroll: 0,
             preview_lines: 0,
             preview_viewport: 0,
@@ -131,16 +143,28 @@ impl App {
             return self.handle_confirm(key);
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        // ctrl-c always quits; enter accepts (copy into cwd) from either mode.
+        if ctrl && key.code == KeyCode::Char('c') {
+            self.should_quit = true;
+            return Ok(());
+        }
+        if key.code == KeyCode::Enter {
+            self.reuse_into_cwd();
+            return Ok(());
+        }
+        match self.mode {
+            Mode::Insert => self.on_key_insert(key)?,
+            Mode::Normal => self.on_key_normal(key)?,
+        }
+        Ok(())
+    }
+
+    /// insert mode: type to edit the query; esc drops to normal.
+    fn on_key_insert(&mut self, key: KeyEvent) -> Result<()> {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
-            KeyCode::Esc => self.should_quit = true,
-            KeyCode::Char('c' | 'q') if ctrl => self.should_quit = true,
+            KeyCode::Esc => self.mode = Mode::Normal,
             KeyCode::Tab => self.toggle_focus(),
-            KeyCode::Char('e') if ctrl => self.pending_edit = self.selected_rel(),
-            KeyCode::Char('d') if ctrl => self.request_delete(),
-            KeyCode::Char('y') if ctrl => self.copy_to_clipboard(),
-            KeyCode::Char('n') if ctrl => self.select_step(1),
-            KeyCode::Char('p') if ctrl => self.select_step(-1),
-            KeyCode::Enter => self.reuse_into_cwd(),
             KeyCode::Up => self.nav(-1),
             KeyCode::Down => self.nav(1),
             KeyCode::PageUp => self.nav_page(-1),
@@ -155,6 +179,41 @@ impl App {
                 self.focus = Focus::Results;
                 self.refresh_results()?;
             }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// normal mode: vim-style navigation and actions.
+    fn on_key_normal(&mut self, key: KeyEvent) -> Result<()> {
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        // any key other than a second `d` cancels a pending delete chord.
+        let pending_d = self.pending_d;
+        self.pending_d = false;
+        match key.code {
+            KeyCode::Char('i' | 'a' | '/') => self.mode = Mode::Insert,
+            KeyCode::Esc => {}
+            KeyCode::Char('j') | KeyCode::Down => self.nav(1),
+            KeyCode::Char('k') | KeyCode::Up => self.nav(-1),
+            KeyCode::Char('d') if ctrl => self.nav_page(1),
+            KeyCode::Char('u') if ctrl => self.nav_page(-1),
+            KeyCode::PageDown => self.nav_page(1),
+            KeyCode::PageUp => self.nav_page(-1),
+            KeyCode::Char('g') => self.go_top(),
+            KeyCode::Char('G') => self.go_bottom(),
+            KeyCode::Char('h') => self.focus = Focus::Results,
+            KeyCode::Char('l') => self.focus = Focus::Preview,
+            KeyCode::Tab => self.toggle_focus(),
+            KeyCode::Char('y') => self.copy_to_clipboard(),
+            KeyCode::Char('e') => self.pending_edit = self.selected_rel(),
+            KeyCode::Char('d') => {
+                if pending_d {
+                    self.request_delete();
+                } else {
+                    self.pending_d = true;
+                }
+            }
+            KeyCode::Char('q') => self.should_quit = true,
             _ => {}
         }
         Ok(())
@@ -219,6 +278,34 @@ impl App {
         self.list_state.select(self.hit_positions.get(self.sel).copied());
     }
 
+    fn select_to(&mut self, ordinal: usize) {
+        if self.hit_positions.is_empty() {
+            return;
+        }
+        self.sel = ordinal.min(self.hit_positions.len() - 1);
+        self.sync_selection();
+        self.refresh_preview();
+    }
+
+    /// jump to the top of the focused pane (gg-style).
+    fn go_top(&mut self) {
+        match self.focus {
+            Focus::Results => self.select_to(0),
+            Focus::Preview => self.preview_scroll = 0,
+        }
+    }
+
+    /// jump to the bottom of the focused pane (G-style).
+    fn go_bottom(&mut self) {
+        match self.focus {
+            Focus::Results => self.select_to(usize::MAX),
+            Focus::Preview => {
+                let viewport = self.preview_viewport.max(1) as usize;
+                self.preview_scroll = self.preview_lines.saturating_sub(viewport) as u16;
+            }
+        }
+    }
+
     fn scroll_preview(&mut self, delta: i32) {
         let viewport = self.preview_viewport.max(1) as usize;
         let max = self.preview_lines.saturating_sub(viewport) as i32;
@@ -252,14 +339,33 @@ impl App {
         }
     }
 
-    /// the statusline mode label, reflecting a pending confirm or the focused pane.
-    pub fn mode(&self) -> &'static str {
+    /// the current vim mode (used by the renderer for the statusline color).
+    pub fn vim_mode(&self) -> Mode {
+        self.mode
+    }
+
+    /// the statusline mode label, reflecting a pending confirm or the vim mode.
+    pub fn mode_label(&self) -> &'static str {
         if self.confirm.is_some() {
             return "CONFIRM";
         }
-        match self.focus {
-            Focus::Results => "SEARCH",
-            Focus::Preview => "PREVIEW",
+        match self.mode {
+            Mode::Insert => "INSERT",
+            Mode::Normal => "NORMAL",
+        }
+    }
+
+    /// the keybind hint shown in the statusline for the current mode.
+    pub fn binds(&self) -> &'static str {
+        if self.confirm.is_some() {
+            "y delete   n cancel"
+        } else {
+            match self.mode {
+                Mode::Insert => "esc normal   ↵ copy   ↑↓ move   ⇥ pane",
+                Mode::Normal => {
+                    "j/k move   g/G top/bot   i search   y yank   e edit   dd del   ⇥ pane   q quit"
+                }
+            }
         }
     }
 

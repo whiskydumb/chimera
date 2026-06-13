@@ -74,9 +74,12 @@ const DEFAULT_CONFIG: &str = "\
 # falls back to $VISUAL / $EDITOR / the platform default when unset.
 # editor = \"nvim\"
 
-# syntax-highlighting theme for the preview (a syntect default theme). options:
+# syntax-highlighting theme for the preview. options:
 # base16-ocean.dark, base16-ocean.light, base16-eighties.dark, base16-mocha.dark,
-# \"Solarized (dark)\", \"Solarized (light)\", InspiredGitHub
+# nord, dracula, gruvbox-dark, gruvbox-light, solarized-dark, solarized-light,
+# monokai, one-half-dark, one-half-light, catppuccin-mocha, catppuccin-macchiato,
+# catppuccin-frappe, catppuccin-latte, github, inspired-github, coldark-dark,
+# coldark-cold, dark-neon, sublime-snazzy, two-dark, zenburn, leet
 theme = \"base16-ocean.dark\"
 ";
 

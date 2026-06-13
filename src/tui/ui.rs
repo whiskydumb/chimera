@@ -4,25 +4,26 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
 use ratatui::Frame;
 
-use crate::tui::app::{App, Focus, RowKind};
+use crate::tui::app::{App, Focus, Mode, RowKind};
 
-// statusline palette (truecolor; the preview already assumes a truecolor terminal).
-const BAR_BG: Color = Color::Rgb(0x2a, 0x2e, 0x3a);
-const DARK: Color = Color::Rgb(0x1e, 0x1e, 0x2e);
-const SEARCH_BG: Color = Color::Rgb(0xb4, 0x9d, 0xf7);
-const PREVIEW_BG: Color = Color::Rgb(0x89, 0xb4, 0xfa);
-const CONFIRM_BG: Color = Color::Rgb(0xf3, 0x8b, 0xa8);
-const KEYS_BG: Color = Color::Rgb(0x3b, 0x40, 0x4e);
-const KEYS_FG: Color = Color::Rgb(0xc8, 0xcc, 0xd4);
-const POS_BG: Color = Color::Rgb(0xa6, 0xe3, 0xa1);
-const SECTION_FG: Color = Color::Rgb(0x94, 0xe2, 0xd5);
+// the status bar uses the terminal's ANSI palette so it matches the user's
+// terminal theme (dark or light) instead of hardcoded colors.
+const BAR_BG: Color = Color::Reset;
+const DARK: Color = Color::Black;
+const INSERT_BG: Color = Color::Green;
+const NORMAL_BG: Color = Color::Blue;
+const CONFIRM_BG: Color = Color::Red;
+const KEYS_BG: Color = Color::DarkGray;
+const KEYS_FG: Color = Color::Gray;
+const POS_BG: Color = Color::Magenta;
+const SECTION_FG: Color = Color::Cyan;
+const FOCUS_BORDER: Color = Color::Cyan;
 
 // @note: powerline separators — require a Nerd Font in the terminal running
 // chimera. swap these for "" (or "|") if glyphs render as boxes.
 const SEP_RIGHT: &str = "\u{e0b0}"; //
 const SEP_LEFT: &str = "\u{e0b2}"; //
 
-const BINDS: &str = "↵ copy   ^Y clip   ^E edit   ^D del   ⇥ pane   ↑↓ move   esc quit";
 const SEARCH_HINT: &str = " Search   'exact  ^prefix  suffix$  !not  *glob ";
 
 pub fn render(frame: &mut Frame, app: &mut App) {
@@ -61,7 +62,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         .collect();
     let list_title = format!(" Results ({}) ", app.hit_count());
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(list_title))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(list_title)
+                .border_style(border_style(app.focus == Focus::Results)),
+        )
         .highlight_symbol("> ")
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     frame.render_stateful_widget(list, body[0], &mut app.list_state);
@@ -72,7 +78,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         .unwrap_or_else(|| " Preview ".to_string());
     let preview = Paragraph::new(app.preview.clone())
         .scroll((app.preview_scroll, 0))
-        .block(Block::default().borders(Borders::ALL).title(preview_title));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(preview_title)
+                .border_style(border_style(app.focus == Focus::Preview)),
+        );
     frame.render_widget(preview, body[1]);
 
     if !app.status.is_empty() {
@@ -84,24 +95,33 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     frame.render_widget(Paragraph::new(bar).style(Style::default().bg(BAR_BG)), rows[3]);
 }
 
-/// builds the lualine-style status bar: a mode block (reflecting the focused
-/// pane) and our keybinds on the left, the selection position on the right.
+/// accents the border of the focused pane.
+fn border_style(focused: bool) -> Style {
+    if focused {
+        Style::default().fg(FOCUS_BORDER)
+    } else {
+        Style::default()
+    }
+}
+
+/// builds the lualine-style status bar: a vim-mode block and the current mode's
+/// keybinds on the left, the selection position on the right.
 fn statusline(app: &App, width: u16) -> Line<'static> {
     let mode_bg = if app.is_confirming() {
         CONFIRM_BG
     } else {
-        match app.focus {
-            Focus::Results => SEARCH_BG,
-            Focus::Preview => PREVIEW_BG,
+        match app.vim_mode() {
+            Mode::Insert => INSERT_BG,
+            Mode::Normal => NORMAL_BG,
         }
     };
     let left: Vec<Span<'static>> = vec![
         Span::styled(
-            format!(" {} ", app.mode()),
+            format!(" {} ", app.mode_label()),
             Style::default().fg(DARK).bg(mode_bg).add_modifier(Modifier::BOLD),
         ),
         Span::styled(SEP_RIGHT, Style::default().fg(mode_bg).bg(KEYS_BG)),
-        Span::styled(format!(" {BINDS} "), Style::default().fg(KEYS_FG).bg(KEYS_BG)),
+        Span::styled(format!(" {} ", app.binds()), Style::default().fg(KEYS_FG).bg(KEYS_BG)),
         Span::styled(SEP_RIGHT, Style::default().fg(KEYS_BG).bg(BAR_BG)),
     ];
 
