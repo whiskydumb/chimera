@@ -55,6 +55,9 @@ pub struct Config {
     pub editor: Option<String>,
     /// syntax-highlighting theme (a syntect default theme name).
     pub theme: String,
+    /// NORMAL-mode keyboard-layout map (vim `langmap`-style): space-separated
+    /// `<layout-char><latin-key>` pairs. an empty string disables it.
+    pub langmap: String,
 }
 
 impl Default for Config {
@@ -62,9 +65,14 @@ impl Default for Config {
         Self {
             editor: None,
             theme: "base16-ocean.dark".to_string(),
+            langmap: DEFAULT_LANGMAP.to_string(),
         }
     }
 }
+
+/// default NORMAL-mode layout map: the russian ЙЦУКЕН layout.
+const DEFAULT_LANGMAP: &str =
+    "йq цw уe кr еt нy гu шi щo зp фa ыs вd аf пg рh оj лk дl яz чx сc мv иb тn ьm";
 
 /// the contents written by `chimera init`.
 const DEFAULT_CONFIG: &str = "\
@@ -81,6 +89,11 @@ const DEFAULT_CONFIG: &str = "\
 # catppuccin-frappe, catppuccin-latte, github, inspired-github, coldark-dark,
 # coldark-cold, dark-neon, sublime-snazzy, two-dark, zenburn, leet
 theme = \"base16-ocean.dark\"
+
+# vim NORMAL-mode keyboard-layout map (like vim's 'langmap'): space-separated
+# \"<layout char><latin key>\" pairs. default maps the russian ЙЦУКЕН layout so the
+# vim keys work on a russian layout; set \"\" to disable, or replace with your own.
+# langmap = \"йq цw уe кr еt нy гu шi щo зp фa ыs вd аf пg рh оj лk дl яz чx сc мv иb тn ьm\"
 ";
 
 impl Config {

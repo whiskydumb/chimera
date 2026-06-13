@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use time::OffsetDateTime;
 use ulid::Ulid;
 
 use crate::config::Paths;
-use crate::library::entry::{Sidecar, SIDECAR_SUFFIX};
+use crate::library::entry::{SIDECAR_SUFFIX, Sidecar};
 
 /// options controlling how an entry is added.
 #[derive(Debug, Default, Clone)]
@@ -27,14 +27,17 @@ pub struct Added {
 
 /// adds a file, or a directory recursively, to the library.
 pub fn add(paths: &Paths, input: &Path, opts: &AddOptions) -> Result<Vec<Added>> {
-    let meta = std::fs::metadata(input)
-        .with_context(|| format!("cannot stat {}", input.display()))?;
+    let meta =
+        std::fs::metadata(input).with_context(|| format!("cannot stat {}", input.display()))?;
     let mut added = Vec::new();
     if meta.is_dir() {
         add_dir(paths, input, opts, &mut added)?;
     } else if meta.is_file() {
         if is_binary(input)? {
-            bail!("{} looks like a binary file; chimera stores text artifacts", input.display());
+            bail!(
+                "{} looks like a binary file; chimera stores text artifacts",
+                input.display()
+            );
         }
         if let Some(a) = add_file(paths, input, opts)? {
             added.push(a);
@@ -82,10 +85,7 @@ fn add_file(paths: &Paths, src: &Path, opts: &AddOptions) -> Result<Option<Added
         .and_then(|n| n.to_str())
         .context("source has no valid utf-8 file name")?;
 
-    let category = opts
-        .category
-        .clone()
-        .unwrap_or_else(|| infer_category(src));
+    let category = opts.category.clone().unwrap_or_else(|| infer_category(src));
 
     let dest_dir = paths.library.join(&category);
     std::fs::create_dir_all(&dest_dir)
@@ -94,7 +94,11 @@ fn add_file(paths: &Paths, src: &Path, opts: &AddOptions) -> Result<Option<Added
     match resolve_dest(&dest_dir, file_name, &sha)? {
         Dest::Dedup(path) => {
             let rel = rel_path(paths, &path)?;
-            Ok(Some(Added { abs_path: path, rel_path: rel, deduped: true }))
+            Ok(Some(Added {
+                abs_path: path,
+                rel_path: rel,
+                deduped: true,
+            }))
         }
         Dest::New(dest) => {
             std::fs::write(&dest, &bytes)
@@ -113,7 +117,11 @@ fn add_file(paths: &Paths, src: &Path, opts: &AddOptions) -> Result<Option<Added
             };
             sidecar.save(&dest)?;
             let rel = rel_path(paths, &dest)?;
-            Ok(Some(Added { abs_path: dest, rel_path: rel, deduped: false }))
+            Ok(Some(Added {
+                abs_path: dest,
+                rel_path: rel,
+                deduped: false,
+            }))
         }
     }
 }
@@ -227,8 +235,8 @@ fn infer_category(path: &Path) -> String {
 /// reads the head of a file and reports whether it looks binary.
 pub fn is_binary(path: &Path) -> Result<bool> {
     use std::io::Read;
-    let mut file = std::fs::File::open(path)
-        .with_context(|| format!("failed to open {}", path.display()))?;
+    let mut file =
+        std::fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let mut buf = [0u8; 8192];
     let n = file.read(&mut buf)?;
     Ok(is_binary_bytes(&buf[..n]))
@@ -346,8 +354,8 @@ pub(crate) fn rehash(paths: &Paths, rel_path: &str) -> Result<()> {
     if !sidecar_path.exists() {
         return Ok(());
     }
-    let bytes = std::fs::read(&content)
-        .with_context(|| format!("failed to read {}", content.display()))?;
+    let bytes =
+        std::fs::read(&content).with_context(|| format!("failed to read {}", content.display()))?;
     let mut sidecar = Sidecar::load(&sidecar_path)?;
     sidecar.sha256 = sha256_hex(&bytes);
     sidecar.updated = OffsetDateTime::now_utc();

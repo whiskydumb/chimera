@@ -1,13 +1,20 @@
 [package]
-name = "chimera"
+name = "chimera-tui"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.88"
 description = "TUI for storing, searching and reusing code, scripts and templates"
 authors = ["whisky"]
 license = "Zlib"
 repository = "https://github.com/whiskydumb/chimera"
+homepage = "https://github.com/whiskydumb/chimera"
 keywords = ["tui", "snippets", "search", "cli", "ratatui"]
 categories = ["command-line-utilities", "development-tools"]
+exclude = ["/samples", "/.github", "/.vscode"]
+
+[[bin]]
+name = "chimera"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.102"
@@ -31,7 +38,10 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 two-face = { version = "0.5.1", default-features = false, features = ["syntect-default-fancy"] }
 ulid = "1.2.1"
 
+[lints.rust]
+unsafe_code = "forbid"
+
 [profile.release]
-lto = "thin"
+lto = true
 codegen-units = 1
 strip = true

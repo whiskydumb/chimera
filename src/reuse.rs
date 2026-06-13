@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use time::OffsetDateTime;
 
 use crate::config::Paths;
@@ -33,7 +33,9 @@ pub fn copy_to_clipboard(paths: &Paths, rel_path: &str) -> Result<()> {
     // so a value copied right before quitting may not persist there. it is fine
     // while the TUI stays open and on windows/macos; harden with fork/wait later.
     let mut clipboard = arboard::Clipboard::new().context("no system clipboard available")?;
-    clipboard.set_text(content).context("failed to set clipboard text")?;
+    clipboard
+        .set_text(content)
+        .context("failed to set clipboard text")?;
     bump_uses(paths, rel_path)?;
     Ok(())
 }

@@ -31,16 +31,24 @@ pub fn search(conn: &Connection, query: &str, limit: usize) -> Result<Results> {
     let records = db::all(conn)?;
 
     if query.is_empty() {
-        let mut names: Vec<Hit> =
-            records.into_iter().map(|record| Hit { record, score: 0 }).collect();
+        let mut names: Vec<Hit> = records
+            .into_iter()
+            .map(|record| Hit { record, score: 0 })
+            .collect();
         names.sort_by(|a, b| a.record.rel_path.cmp(&b.record.rel_path));
         names.truncate(limit);
-        return Ok(Results { names, content: Vec::new() });
+        return Ok(Results {
+            names,
+            content: Vec::new(),
+        });
     }
 
     if is_glob(query) {
         let names = glob_search(query, &records, limit);
-        return Ok(Results { names, content: Vec::new() });
+        return Ok(Results {
+            names,
+            content: Vec::new(),
+        });
     }
 
     let by_id: HashMap<String, Record> =
@@ -60,7 +68,10 @@ pub fn search(conn: &Connection, query: &str, limit: usize) -> Result<Results> {
                 continue;
             }
             if let Some(record) = by_id.get(&id) {
-                content.push(Hit { record: record.clone(), score: 0 });
+                content.push(Hit {
+                    record: record.clone(),
+                    score: 0,
+                });
             }
             if content.len() >= limit {
                 break;
@@ -95,7 +106,10 @@ fn glob_search(query: &str, records: &[Record], limit: usize) -> Vec<Hit> {
     let mut hits: Vec<Hit> = records
         .iter()
         .filter(|r| matcher.is_match(&r.name) || matcher.is_match(&r.rel_path))
-        .map(|r| Hit { record: r.clone(), score: 0 })
+        .map(|r| Hit {
+            record: r.clone(),
+            score: 0,
+        })
         .collect();
     hits.sort_by(|a, b| a.record.rel_path.cmp(&b.record.rel_path));
     hits.truncate(limit);
@@ -112,13 +126,20 @@ fn fuzzy(query: &str, records: &[Record]) -> Vec<Hit> {
     for record in records {
         let tags = record.tags.join(" ");
         let mut best: Option<u32> = None;
-        for field in [record.name.as_str(), record.rel_path.as_str(), tags.as_str()] {
+        for field in [
+            record.name.as_str(),
+            record.rel_path.as_str(),
+            tags.as_str(),
+        ] {
             if let Some(score) = pattern.score(Utf32Str::new(field, &mut buf), &mut matcher) {
                 best = Some(best.map_or(score, |b| b.max(score)));
             }
         }
         if let Some(score) = best {
-            hits.push(Hit { record: record.clone(), score: score as i64 });
+            hits.push(Hit {
+                record: record.clone(),
+                score: score as i64,
+            });
         }
     }
     hits.sort_by(|a, b| {

@@ -7,7 +7,7 @@ use ulid::Ulid;
 
 use crate::config::Paths;
 use crate::index::db::{self, Record};
-use crate::library::entry::{Sidecar, SIDECAR_SUFFIX};
+use crate::library::entry::{SIDECAR_SUFFIX, Sidecar};
 use crate::library::store;
 
 /// clears the index and rebuilds it by walking the library. returns the count.
@@ -42,7 +42,8 @@ pub fn rebuild(conn: &Connection, paths: &Paths) -> Result<usize> {
 /// indexes a single content file. returns `false` when the file was skipped
 /// (e.g. it turned out to be binary). synthesizes a sidecar if one is missing.
 pub(crate) fn index_one(conn: &Connection, paths: &Paths, path: &Path) -> Result<bool> {
-    let bytes = std::fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
+    let bytes =
+        std::fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
     if bytes.contains(&0) {
         return Ok(false);
     }

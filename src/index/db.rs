@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::config::Paths;
 
@@ -94,7 +94,10 @@ pub fn upsert(conn: &Connection, rec: &Record, content: &str, size: u64, mtime: 
     .context("failed to upsert entry")?;
 
     // rebuild the fts row for this entry (delete + insert keeps it simple/correct).
-    conn.execute("DELETE FROM entries_fts WHERE entry_id = ?1", params![rec.id])?;
+    conn.execute(
+        "DELETE FROM entries_fts WHERE entry_id = ?1",
+        params![rec.id],
+    )?;
     conn.execute(
         "INSERT INTO entries_fts (entry_id, name, tags, description, content)
          VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -106,9 +109,11 @@ pub fn upsert(conn: &Connection, rec: &Record, content: &str, size: u64, mtime: 
 /// removes an entry (and its full-text row) by its library-relative path.
 pub fn remove(conn: &Connection, rel_path: &str) -> Result<()> {
     let id: Option<String> = conn
-        .query_row("SELECT id FROM entries WHERE rel_path = ?1", params![rel_path], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT id FROM entries WHERE rel_path = ?1",
+            params![rel_path],
+            |row| row.get(0),
+        )
         .optional()?;
     if let Some(id) = id {
         conn.execute("DELETE FROM entries_fts WHERE entry_id = ?1", params![id])?;
@@ -125,7 +130,9 @@ pub fn search_fts(conn: &Connection, match_query: &str, limit: usize) -> Result<
          ORDER BY bm25(entries_fts)
          LIMIT ?2",
     )?;
-    let rows = stmt.query_map(params![match_query, limit as i64], |row| row.get::<_, String>(0))?;
+    let rows = stmt.query_map(params![match_query, limit as i64], |row| {
+        row.get::<_, String>(0)
+    })?;
     let mut ids = Vec::new();
     for row in rows {
         ids.push(row?);

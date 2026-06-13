@@ -1,14 +1,15 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use anyhow::Result;
+use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
 };
 use ratatui::text::Text;
 use ratatui::widgets::ListState;
-use ratatui::DefaultTerminal;
 use rusqlite::Connection;
 
 use crate::config::{Config, Paths};
@@ -53,6 +54,8 @@ pub struct App {
     cwd: PathBuf,
     conn: Connection,
     highlighter: Highlighter,
+    /// NORMAL-mode layout remap (e.g. cyrillic→latin), built from config.langmap.
+    langmap: HashMap<char, char>,
     pub query: String,
     pub rows: Vec<RowKind>,
     /// indices into `rows` that are selectable hits (skips headers).
@@ -79,12 +82,14 @@ pub struct App {
 impl App {
     pub fn new(paths: Paths, config: Config, cwd: PathBuf, conn: Connection) -> Self {
         let highlighter = Highlighter::new(&config.theme);
+        let langmap = parse_langmap(&config.langmap);
         Self {
             paths,
             config,
             cwd,
             conn,
             highlighter,
+            langmap,
             query: String::new(),
             rows: Vec::new(),
             hit_positions: Vec::new(),
@@ -144,7 +149,7 @@ impl App {
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         // ctrl-c always quits; enter accepts (copy into cwd) from either mode.
-        if ctrl && key.code == KeyCode::Char('c') {
+        if ctrl && normalize_code(&self.langmap, key.code) == KeyCode::Char('c') {
             self.should_quit = true;
             return Ok(());
         }
@@ -190,7 +195,9 @@ impl App {
         // any key other than a second `d` cancels a pending delete chord.
         let pending_d = self.pending_d;
         self.pending_d = false;
-        match key.code {
+        // normalize a non-latin layout (e.g. cyrillic) to the physical qwerty key
+        // so vim commands work regardless of the active keyboard layout.
+        match normalize_code(&self.langmap, key.code) {
             KeyCode::Char('i' | 'a' | '/') => self.mode = Mode::Insert,
             KeyCode::Esc => {}
             KeyCode::Char('j') | KeyCode::Down => self.nav(1),
@@ -275,7 +282,8 @@ impl App {
     }
 
     fn sync_selection(&mut self) {
-        self.list_state.select(self.hit_positions.get(self.sel).copied());
+        self.list_state
+            .select(self.hit_positions.get(self.sel).copied());
     }
 
     fn select_to(&mut self, ordinal: usize) {
@@ -417,9 +425,9 @@ impl App {
 
     /// selects the hit with the given relative path, if it is present.
     fn select_rel(&mut self, rel: &str) {
-        let found = self.hit_positions.iter().position(|&i| {
-            matches!(&self.rows[i], RowKind::Hit(hit) if hit.record.rel_path == rel)
-        });
+        let found = self.hit_positions.iter().position(
+            |&i| matches!(&self.rows[i], RowKind::Hit(hit) if hit.record.rel_path == rel),
+        );
         if let Some(ordinal) = found {
             self.sel = ordinal;
             self.sync_selection();
@@ -523,7 +531,8 @@ impl App {
             Ok(bytes) => {
                 let content = String::from_utf8_lossy(&bytes);
                 let name = rel.rsplit('/').next().unwrap_or(&rel);
-                self.highlighter.render(&content, name, PREVIEW_MAX_LINES, &terms)
+                self.highlighter
+                    .render(&content, name, PREVIEW_MAX_LINES, &terms)
             }
             Err(err) => Text::raw(format!("cannot read file: {err}")),
         };
@@ -544,7 +553,10 @@ fn build_rows(results: Results) -> (Vec<RowKind>, Vec<usize>) {
     }
     if !results.content.is_empty() {
         if dual {
-            rows.push(RowKind::Header(format!("content ({})", results.content.len())));
+            rows.push(RowKind::Header(format!(
+                "content ({})",
+                results.content.len()
+            )));
         }
         rows.extend(results.content.into_iter().map(RowKind::Hit));
     }
@@ -554,6 +566,38 @@ fn build_rows(results: Results) -> (Vec<RowKind>, Vec<usize>) {
         .filter_map(|(i, row)| matches!(row, RowKind::Hit(_)).then_some(i))
         .collect();
     (rows, hit_positions)
+}
+
+/// parses a vim-`langmap`-style spec (`"<layout><latin> ..."` pairs) into a lookup
+/// table keyed by the lowercased layout char.
+fn parse_langmap(spec: &str) -> HashMap<char, char> {
+    spec.split_whitespace()
+        .filter_map(|pair| {
+            let mut chars = pair.chars();
+            let from = chars.next()?.to_lowercase().next()?;
+            let to = chars.next()?.to_ascii_lowercase();
+            Some((from, to))
+        })
+        .collect()
+}
+
+/// remaps a char through the langmap (NORMAL mode only), preserving case;
+/// unmapped chars pass through unchanged.
+fn map_char(langmap: &HashMap<char, char>, c: char) -> char {
+    let lower = c.to_lowercase().next().unwrap_or(c);
+    match langmap.get(&lower) {
+        Some(&mapped) if c.is_uppercase() => mapped.to_ascii_uppercase(),
+        Some(&mapped) => mapped,
+        None => c,
+    }
+}
+
+/// translates a `Char` key through the langmap; other key codes pass through.
+fn normalize_code(langmap: &HashMap<char, char>, code: KeyCode) -> KeyCode {
+    match code {
+        KeyCode::Char(c) => KeyCode::Char(map_char(langmap, c)),
+        other => other,
+    }
 }
 
 #[cfg(test)]

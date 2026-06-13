@@ -153,7 +153,10 @@ fn content_spans(
             j += 1;
         }
         let text: String = chars[i..j].iter().map(|(c, _)| *c).collect();
-        spans.push(Span::styled(text, if is_match { match_style } else { base }));
+        spans.push(Span::styled(
+            text,
+            if is_match { match_style } else { base },
+        ));
         i = j;
     }
     spans

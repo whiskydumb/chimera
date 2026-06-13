@@ -1,8 +1,8 @@
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph};
-use ratatui::Frame;
 
 use crate::tui::app::{App, Focus, Mode, RowKind};
 
@@ -92,7 +92,10 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     }
 
     let bar = statusline(app, rows[3].width);
-    frame.render_widget(Paragraph::new(bar).style(Style::default().bg(BAR_BG)), rows[3]);
+    frame.render_widget(
+        Paragraph::new(bar).style(Style::default().bg(BAR_BG)),
+        rows[3],
+    );
 }
 
 /// accents the border of the focused pane.
@@ -118,10 +121,16 @@ fn statusline(app: &App, width: u16) -> Line<'static> {
     let left: Vec<Span<'static>> = vec![
         Span::styled(
             format!(" {} ", app.mode_label()),
-            Style::default().fg(DARK).bg(mode_bg).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(DARK)
+                .bg(mode_bg)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(SEP_RIGHT, Style::default().fg(mode_bg).bg(KEYS_BG)),
-        Span::styled(format!(" {} ", app.binds()), Style::default().fg(KEYS_FG).bg(KEYS_BG)),
+        Span::styled(
+            format!(" {} ", app.binds()),
+            Style::default().fg(KEYS_FG).bg(KEYS_BG),
+        ),
         Span::styled(SEP_RIGHT, Style::default().fg(KEYS_BG).bg(BAR_BG)),
     ];
 
@@ -130,7 +139,10 @@ fn statusline(app: &App, width: u16) -> Line<'static> {
         Span::styled(SEP_LEFT, Style::default().fg(POS_BG).bg(BAR_BG)),
         Span::styled(
             position,
-            Style::default().fg(DARK).bg(POS_BG).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(DARK)
+                .bg(POS_BG)
+                .add_modifier(Modifier::BOLD),
         ),
     ];
 
@@ -142,7 +154,10 @@ fn statusline(app: &App, width: u16) -> Line<'static> {
     let filler = (width as usize).saturating_sub(used);
 
     let mut spans = left;
-    spans.push(Span::styled(" ".repeat(filler), Style::default().bg(BAR_BG)));
+    spans.push(Span::styled(
+        " ".repeat(filler),
+        Style::default().bg(BAR_BG),
+    ));
     spans.extend(right);
     Line::from(spans)
 }

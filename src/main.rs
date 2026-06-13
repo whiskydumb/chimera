@@ -28,9 +28,20 @@ fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Add { paths: inputs, category, tags, description }) => {
-            cmd_add(&paths, &inputs, AddOptions { category, tags, description })
-        }
+        Some(Command::Add {
+            paths: inputs,
+            category,
+            tags,
+            description,
+        }) => cmd_add(
+            &paths,
+            &inputs,
+            AddOptions {
+                category,
+                tags,
+                description,
+            },
+        ),
         Some(Command::Search { query, limit }) => cmd_search(&paths, &query, limit),
         Some(Command::Reindex) => cmd_reindex(&paths),
         Some(Command::List) => cmd_list(&paths),
@@ -69,7 +80,12 @@ fn cmd_add(paths: &Paths, inputs: &[PathBuf], opts: AddOptions) -> Result<()> {
 fn cmd_search(paths: &Paths, query: &str, limit: usize) -> Result<()> {
     let conn = index::db::open(paths)?;
     let results = index::search::search(&conn, query, limit)?;
-    tracing::info!(query, names = results.names.len(), content = results.content.len(), "search");
+    tracing::info!(
+        query,
+        names = results.names.len(),
+        content = results.content.len(),
+        "search"
+    );
     if results.names.is_empty() && results.content.is_empty() {
         println!("no matches for {query:?}");
         return Ok(());
@@ -145,7 +161,13 @@ fn cmd_mv(paths: &Paths, from: &str, to: &str) -> Result<()> {
     Ok(())
 }
 
-fn cmd_tag(paths: &Paths, rel: &str, add: &[String], rm: &[String], set: Option<Vec<String>>) -> Result<()> {
+fn cmd_tag(
+    paths: &Paths,
+    rel: &str,
+    add: &[String],
+    rm: &[String],
+    set: Option<Vec<String>>,
+) -> Result<()> {
     let tags = store::edit_tags(paths, rel, add, rm, set)?;
     let conn = index::db::open(paths)?;
     index::reindex::index_one(&conn, paths, &paths.library.join(rel))?;

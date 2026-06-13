@@ -6,7 +6,7 @@ use std::io::IsTerminal;
 use std::path::Path;
 use std::sync::mpsc::{self, Sender};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use notify::{RecursiveMode, Watcher};
 use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use ratatui::crossterm::execute;
@@ -19,7 +19,9 @@ use crate::tui::app::App;
 /// launches the interactive TUI.
 pub fn run(paths: Paths) -> Result<()> {
     if !std::io::stdout().is_terminal() || !std::io::stdin().is_terminal() {
-        bail!("the chimera TUI needs an interactive terminal; use `chimera search <query>` in pipelines");
+        bail!(
+            "the chimera TUI needs an interactive terminal; use `chimera search <query>` in pipelines"
+        );
     }
 
     let cwd = std::env::current_dir().context("cannot determine the current directory")?;
