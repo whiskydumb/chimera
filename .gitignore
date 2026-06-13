@@ -1,0 +1,22 @@
+# rust build artifacts
+/target
+
+# @note: this is a binary application, so Cargo.lock IS committed (do not ignore it)
+
+# backup files from rustfmt and others
+**/*.rs.bk
+*.pdb
+
+# editor / IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# os junk
+.DS_Store
+Thumbs.db
+
+# local environment overrides
+.env
+.env.local
