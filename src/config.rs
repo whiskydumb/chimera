@@ -58,6 +58,9 @@ pub struct Config {
     /// NORMAL-mode keyboard-layout map (vim `langmap`-style): space-separated
     /// `<layout-char><latin-key>` pairs. an empty string disables it.
     pub langmap: String,
+    /// use Nerd-Font glyphs (powerline separators) in the status bar; set false
+    /// on terminals without a Nerd Font to fall back to ascii.
+    pub nerd_fonts: bool,
 }
 
 impl Default for Config {
@@ -66,6 +69,7 @@ impl Default for Config {
             editor: None,
             theme: "base16-ocean.dark".to_string(),
             langmap: DEFAULT_LANGMAP.to_string(),
+            nerd_fonts: true,
         }
     }
 }
@@ -94,6 +98,10 @@ theme = \"base16-ocean.dark\"
 # \"<layout char><latin key>\" pairs. default maps the russian ЙЦУКЕН layout so the
 # vim keys work on a russian layout; set \"\" to disable, or replace with your own.
 # langmap = \"йq цw уe кr еt нy гu шi щo зp фa ыs вd аf пg рh оj лk дl яz чx сc мv иb тn ьm\"
+
+# use Nerd-Font glyphs (powerline separators) in the status bar; set false on a
+# terminal without a Nerd Font to fall back to ascii.
+nerd_fonts = true
 ";
 
 impl Config {

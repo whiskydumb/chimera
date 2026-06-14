@@ -366,15 +366,23 @@ impl App {
     /// the keybind hint shown in the statusline for the current mode.
     pub fn binds(&self) -> &'static str {
         if self.confirm.is_some() {
-            "y delete   n cancel"
-        } else {
-            match self.mode {
-                Mode::Insert => "esc normal   ↵ copy   ↑↓ move   ⇥ pane",
-                Mode::Normal => {
-                    "j/k move   g/G top/bot   i search   y yank   e edit   dd del   ⇥ pane   q quit"
-                }
+            return "y delete   n cancel";
+        }
+        match (self.mode, self.config.nerd_fonts) {
+            (Mode::Insert, true) => "esc normal   ↵ copy   ↑↓ move   ⇥ pane",
+            (Mode::Insert, false) => "esc normal   enter copy   up/dn move   tab pane",
+            (Mode::Normal, true) => {
+                "j/k move   g/G top/bot   i search   y yank   e edit   dd del   ⇥ pane   q quit"
+            }
+            (Mode::Normal, false) => {
+                "j/k move   g/G top/bot   i search   y yank   e edit   dd del   tab pane   q quit"
             }
         }
+    }
+
+    /// whether to render Nerd-Font glyphs (powerline separators) in the status bar.
+    pub fn nerd_fonts(&self) -> bool {
+        self.config.nerd_fonts
     }
 
     /// whether a destructive action is awaiting confirmation.

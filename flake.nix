@@ -19,7 +19,7 @@
           strictDeps = true;
           nativeBuildInputs = [ pkgs.pkg-config ];
           buildInputs =
-            pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.xorg.libxcb ]
+            pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.libxcb ]
             ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.libiconv ];
         };
 
@@ -29,9 +29,10 @@
       {
         packages.default = chimera;
 
-        apps.default = flake-utils.lib.mkApp {
-          drv = chimera;
-          name = "chimera";
+        apps.default = {
+          type = "app";
+          program = "${chimera}/bin/chimera";
+          meta.description = "TUI for storing, searching and reusing code artifacts";
         };
 
         checks.default = chimera;

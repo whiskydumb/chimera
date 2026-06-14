@@ -118,6 +118,13 @@ fn statusline(app: &App, width: u16) -> Line<'static> {
             Mode::Normal => NORMAL_BG,
         }
     };
+    // powerline separators need a Nerd Font; without one fall back to plain
+    // color blocks (empty separators).
+    let (sep_r, sep_l) = if app.nerd_fonts() {
+        (SEP_RIGHT, SEP_LEFT)
+    } else {
+        ("", "")
+    };
     let left: Vec<Span<'static>> = vec![
         Span::styled(
             format!(" {} ", app.mode_label()),
@@ -126,17 +133,17 @@ fn statusline(app: &App, width: u16) -> Line<'static> {
                 .bg(mode_bg)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(SEP_RIGHT, Style::default().fg(mode_bg).bg(KEYS_BG)),
+        Span::styled(sep_r, Style::default().fg(mode_bg).bg(KEYS_BG)),
         Span::styled(
             format!(" {} ", app.binds()),
             Style::default().fg(KEYS_FG).bg(KEYS_BG),
         ),
-        Span::styled(SEP_RIGHT, Style::default().fg(KEYS_BG).bg(BAR_BG)),
+        Span::styled(sep_r, Style::default().fg(KEYS_BG).bg(BAR_BG)),
     ];
 
     let position = format!(" {}/{} ", app.current_pos(), app.hit_count());
     let right: Vec<Span<'static>> = vec![
-        Span::styled(SEP_LEFT, Style::default().fg(POS_BG).bg(BAR_BG)),
+        Span::styled(sep_l, Style::default().fg(POS_BG).bg(BAR_BG)),
         Span::styled(
             position,
             Style::default()

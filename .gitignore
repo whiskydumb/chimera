@@ -20,3 +20,6 @@ Thumbs.db
 # local environment overrides
 .env
 .env.local
+
+# direnv cache (.envrc itself is committed)
+.direnv/
