@@ -8,6 +8,7 @@ authors = ["whisky"]
 license = "Zlib"
 repository = "https://github.com/whiskydumb/chimera"
 homepage = "https://github.com/whiskydumb/chimera"
+readme = "README.md"
 keywords = ["tui", "snippets", "search", "cli", "ratatui"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["/samples", "/.github", "/.vscode"]

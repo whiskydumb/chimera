@@ -179,7 +179,10 @@ mod tests {
 
     #[test]
     fn literal_terms_strips_operators_inverse_and_glob() {
-        assert_eq!(literal_terms("'aws ^py tf$ !docker *.rs"), vec!["aws", "py", "tf"]);
+        assert_eq!(
+            literal_terms("'aws ^py tf$ !docker *.rs"),
+            vec!["aws", "py", "tf"]
+        );
         assert!(literal_terms("").is_empty());
         assert!(literal_terms("!nope").is_empty());
     }

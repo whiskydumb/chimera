@@ -80,7 +80,10 @@ fn rm_removes_entry() {
     let home = TempDir::new().unwrap();
     let work = TempDir::new().unwrap();
     add_file(&home, &work, "deploy.sh", "echo deploy\n");
-    chimera(&home).args(["rm", "bash/deploy.sh"]).assert().success();
+    chimera(&home)
+        .args(["rm", "bash/deploy.sh"])
+        .assert()
+        .success();
     chimera(&home)
         .arg("list")
         .assert()
@@ -143,7 +146,12 @@ fn copy_into_directory() {
     let dest = TempDir::new().unwrap();
     add_file(&home, &work, "deploy.sh", "echo deploy\n");
     chimera(&home)
-        .args(["copy", "bash/deploy.sh", "--to", dest.path().to_str().unwrap()])
+        .args([
+            "copy",
+            "bash/deploy.sh",
+            "--to",
+            dest.path().to_str().unwrap(),
+        ])
         .assert()
         .success();
     dest.child("deploy.sh").assert(predicate::path::exists());
@@ -153,7 +161,8 @@ fn copy_into_directory() {
 fn init_writes_config() {
     let home = TempDir::new().unwrap();
     chimera(&home).arg("init").assert().success();
-    home.child("config.toml").assert(predicate::str::contains("theme"));
+    home.child("config.toml")
+        .assert(predicate::str::contains("theme"));
 }
 
 #[test]

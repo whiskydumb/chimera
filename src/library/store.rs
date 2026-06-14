@@ -369,7 +369,10 @@ mod tests {
 
     #[test]
     fn split_name_handles_dotfiles_and_extensions() {
-        assert_eq!(split_name("deploy.sh"), ("deploy".into(), Some("sh".into())));
+        assert_eq!(
+            split_name("deploy.sh"),
+            ("deploy".into(), Some("sh".into()))
+        );
         assert_eq!(split_name("a.b.c"), ("a.b".into(), Some("c".into())));
         assert_eq!(split_name(".bashrc"), (".bashrc".into(), None));
         assert_eq!(split_name("Makefile"), ("Makefile".into(), None));
