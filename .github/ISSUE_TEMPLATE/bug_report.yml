@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a problem with chimera
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. chimera add ./foo.sh
+        2. chimera search foo
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: chimera version
+      description: output of `chimera --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: e.g. Konsole, Windows Terminal, kitty, WezTerm, Alacritty
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: run a cli command with `CHIMERA_LOG=debug` and paste relevant output
+      render: text
