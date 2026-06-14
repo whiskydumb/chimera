@@ -1,0 +1,24 @@
+---
+- name: deploy nginx reverse proxy
+  hosts: web
+  become: true
+  vars:
+    upstream_port: 8080
+  tasks:
+    - name: install nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: render site config
+      ansible.builtin.template:
+        src: site.conf.j2
+        dest: /etc/nginx/conf.d/app.conf
+        mode: "0644"
+      notify: reload nginx
+
+  handlers:
+    - name: reload nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
