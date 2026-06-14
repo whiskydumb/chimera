@@ -64,3 +64,45 @@ impl Sidecar {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn path_for_appends_suffix() {
+        let p = Sidecar::path_for(Path::new("a/b/deploy.sh"));
+        assert!(p.to_string_lossy().ends_with("deploy.sh.chm.toml"));
+    }
+
+    #[test]
+    fn sidecar_round_trips_on_disk() {
+        let dir = std::env::temp_dir().join(format!("chimera_entry_{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let content = dir.join("snippet.sh");
+        std::fs::write(&content, "echo hi").unwrap();
+
+        let now = OffsetDateTime::now_utc();
+        let sidecar = Sidecar {
+            id: "01ABC".to_string(),
+            tags: vec!["a".to_string(), "b".to_string()],
+            description: "desc".to_string(),
+            language: None,
+            source: Some("/orig".to_string()),
+            added: now,
+            updated: now,
+            uses: 3,
+            sha256: "deadbeef".to_string(),
+        };
+        sidecar.save(&content).unwrap();
+        let loaded = Sidecar::load(&Sidecar::path_for(&content)).unwrap();
+
+        assert_eq!(loaded.id, "01ABC");
+        assert_eq!(loaded.tags, vec!["a", "b"]);
+        assert_eq!(loaded.uses, 3);
+        assert_eq!(loaded.sha256, "deadbeef");
+        assert_eq!(loaded.added, now);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

@@ -38,7 +38,7 @@
         checks.default = chimera;
 
         devShells.default = craneLib.devShell {
-          packages = with pkgs; [ rust-analyzer just ];
+          packages = with pkgs; [ rust-analyzer just cargo-nextest ];
         };
       });
 }

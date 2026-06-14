@@ -613,6 +613,23 @@ mod tests {
     use super::*;
     use crate::library::store::AddOptions;
 
+    #[test]
+    fn parse_langmap_builds_table() {
+        let map = parse_langmap(&Config::default().langmap);
+        assert_eq!(map.get(&'о'), Some(&'j'));
+        assert_eq!(map.get(&'л'), Some(&'k'));
+        assert!(parse_langmap("").is_empty());
+    }
+
+    #[test]
+    fn normalize_maps_layout_preserving_case() {
+        let map = parse_langmap(&Config::default().langmap);
+        assert_eq!(normalize_code(&map, KeyCode::Char('о')), KeyCode::Char('j'));
+        assert_eq!(normalize_code(&map, KeyCode::Char('П')), KeyCode::Char('G'));
+        assert_eq!(normalize_code(&map, KeyCode::Char('j')), KeyCode::Char('j'));
+        assert_eq!(normalize_code(&map, KeyCode::Esc), KeyCode::Esc);
+    }
+
     fn temp_paths() -> Paths {
         let root = std::env::temp_dir().join(format!("chimera_test_{}", ulid::Ulid::new()));
         let paths = Paths {

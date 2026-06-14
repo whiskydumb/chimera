@@ -362,3 +362,40 @@ pub(crate) fn rehash(paths: &Paths, rel_path: &str) -> Result<()> {
     sidecar.save(&content)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_name_handles_dotfiles_and_extensions() {
+        assert_eq!(split_name("deploy.sh"), ("deploy".into(), Some("sh".into())));
+        assert_eq!(split_name("a.b.c"), ("a.b".into(), Some("c".into())));
+        assert_eq!(split_name(".bashrc"), (".bashrc".into(), None));
+        assert_eq!(split_name("Makefile"), ("Makefile".into(), None));
+    }
+
+    #[test]
+    fn infer_category_by_name_and_extension() {
+        assert_eq!(infer_category(Path::new("x.rs")), "rust");
+        assert_eq!(infer_category(Path::new("x.zig")), "zig");
+        assert_eq!(infer_category(Path::new("Dockerfile")), "docker");
+        assert_eq!(infer_category(Path::new("docker-compose.yml")), "docker");
+        assert_eq!(infer_category(Path::new("weird.qzx")), "misc");
+    }
+
+    #[test]
+    fn binary_detection_uses_nul_byte() {
+        assert!(is_binary_bytes(b"abc\0def"));
+        assert!(!is_binary_bytes(b"plain text"));
+    }
+
+    #[test]
+    fn sha256_hex_matches_known_vector() {
+        // sha256("abc")
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+}

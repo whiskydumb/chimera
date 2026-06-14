@@ -126,3 +126,39 @@ impl Config {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_has_expected_values() {
+        let cfg = Config::default();
+        assert_eq!(cfg.theme, "base16-ocean.dark");
+        assert!(cfg.editor.is_none());
+        assert!(cfg.nerd_fonts);
+        assert!(cfg.langmap.contains("оj"));
+    }
+
+    #[test]
+    fn write_default_then_load_round_trips() {
+        let root = std::env::temp_dir().join(format!("chimera_cfg_{}", ulid::Ulid::new()));
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = Paths {
+            library: root.join("library"),
+            db: root.join("index.sqlite"),
+            config: root.join("config.toml"),
+            root: root.clone(),
+        };
+
+        assert!(Config::write_default(&paths, false).unwrap());
+        // a second call without --force is a no-op.
+        assert!(!Config::write_default(&paths, false).unwrap());
+
+        let loaded = Config::load(&paths).unwrap();
+        assert_eq!(loaded.theme, "base16-ocean.dark");
+        assert!(loaded.nerd_fonts);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

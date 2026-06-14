@@ -45,3 +45,8 @@ unsafe_code = "forbid"
 lto = true
 codegen-units = 1
 strip = true
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+assert_fs = "1.1.4"
+predicates = "3.1.4"

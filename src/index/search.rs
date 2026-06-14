@@ -163,3 +163,31 @@ fn fts_query(query: &str) -> Option<String> {
         Some(parts.join(" "))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_glob_detects_metachars() {
+        assert!(is_glob("*.rs"));
+        assert!(is_glob("a?b"));
+        assert!(is_glob("[ab]c"));
+        assert!(!is_glob("docker"));
+        assert!(!is_glob("a.b"));
+    }
+
+    #[test]
+    fn literal_terms_strips_operators_inverse_and_glob() {
+        assert_eq!(literal_terms("'aws ^py tf$ !docker *.rs"), vec!["aws", "py", "tf"]);
+        assert!(literal_terms("").is_empty());
+        assert!(literal_terms("!nope").is_empty());
+    }
+
+    #[test]
+    fn fts_query_builds_quoted_prefix_and() {
+        assert_eq!(fts_query("aws s3").as_deref(), Some("\"aws\"* \"s3\"*"));
+        assert_eq!(fts_query(""), None);
+        assert_eq!(fts_query("*.rs"), None);
+    }
+}

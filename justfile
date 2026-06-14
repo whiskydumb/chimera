@@ -13,7 +13,7 @@ lint:
 
 # run the test suite
 test:
-    cargo test --all
+    cargo nextest run --all-features
 
 # everything CI runs
 check: lint test
